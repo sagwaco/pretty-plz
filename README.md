@@ -19,28 +19,47 @@ eval "$cmd"
 
 ## Quickstart
 
+Install:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sagwaco/pretty-plz/main/install.sh | sh
+```
+
+Configure and use:
+
+```bash
 plz configure   # pick a provider and enable shell auto-prefill
+```
+
+```bash
 plz find the biggest files here
 ```
 
-Or build from source (requires Rust 1.85+):
+Optional configuration:
+
+<details>
+<summary><b>Build from source (requires Rust 1.85+)</b></summary>
 
 ```bash
-git clone git@github.com:sagwaco/pretty-plz.git
-cd pretty-plz
+git clone git@github.com:sagwaco/pretty-plz.git && cd pretty-plz
+```
+
+```bash
 cargo install --path .
 ```
 
 Make sure `~/.cargo/bin` is on your `PATH` if you built from source.
+</details>
 
-Or set credentials manually and skip configure:
+
+<details>
+<summary><b>Set credentials manually (optional):</b></summary>
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
 plz list files in cwd
 ```
+</details>
 
 ## Usage
 
