@@ -1,6 +1,6 @@
 {
   "name": "@sagwaco/plz",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Natural-language to shell-command CLI",
   "license": "Apache-2.0",
   "repository": {
