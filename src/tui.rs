@@ -1,4 +1,7 @@
+use std::fmt::Display;
+
 use inquire::list_option::ListOption;
+use inquire::ui::{RenderConfig, Styled};
 use inquire::{Confirm, InquireError, Password, PasswordDisplayMode, Select, Text};
 
 use crate::error::{Error, Result};
@@ -18,6 +21,33 @@ pub enum LoginAction {
 
 const OTHER_LABEL: &str = "Other (type your own answer)…";
 
+const CHOICE_HELP: &str = "↑↓ to move, Enter to pick, Esc to cancel";
+
+/// inquire's frame renderer discards wholly empty lines; a lone NBSP reads as blank.
+const LIST_FOOTER_GAP: &str = "\n\u{00A0}";
+
+/// `>` on the highlighted row, `-` on the others — same column, caret replaces the dash.
+fn choice_render_config() -> RenderConfig<'static> {
+    RenderConfig {
+        highlighted_option_prefix: Styled::new(">"),
+        unhighlighted_option_prefix: Styled::new("-"),
+        ..RenderConfig::default()
+    }
+}
+
+/// Blank line between the prompt and the first option.
+fn choice_prompt(message: &str) -> String {
+    format!("{message}\n")
+}
+
+/// Shared layout for list pickers: no filter input (hides the stray cursor on the prompt).
+fn choice_select<'a, T: Display>(prompt: &'a str, options: Vec<T>) -> Select<'a, T> {
+    Select::new(prompt, options)
+        .with_render_config(choice_render_config())
+        .without_filtering()
+        .with_help_message(CHOICE_HELP)
+}
+
 fn map_inquire_err(e: InquireError) -> Error {
     match e {
         InquireError::OperationCanceled | InquireError::OperationInterrupted => Error::Cancelled,
@@ -28,13 +58,12 @@ fn map_inquire_err(e: InquireError) -> Error {
 /// Render a numbered list of candidate commands, return the chosen `cmd`
 /// string. The TUI renders to /dev/tty; stdout stays clean.
 ///
-/// Each option is shown on two lines — the command on top, a dim
-/// explanation indented underneath so it lines up with the start of the
-/// command. Long commands and explanations are pre-wrapped with a hanging
-/// 2-space indent so soft-wrapped continuations also start past the `>`
-/// caret instead of bleeding back to column 0. The embedded `\x1b[0m`
-/// after the command cancels any outer "selected option" style (default
-/// cyan) so the explanation always renders as dim default-color,
+/// Each option is shown on two lines — a short explanation on top, the
+/// command in dim text indented underneath. The row prefix is `>` when
+/// highlighted and `-` otherwise. Long text is pre-wrapped with a hanging
+/// 2-space indent so soft-wrapped continuations do not bleed back to
+/// column 0. The embedded `\x1b[0m` after the explanation cancels any outer
+/// "selected option" style (default cyan) so the command always renders dim,
 /// regardless of whether its row is highlighted.
 pub fn pick_command(commands: &[Command]) -> Result<String> {
     if commands.len() == 1 {
@@ -42,20 +71,24 @@ pub fn pick_command(commands: &[Command]) -> Result<String> {
         return Ok(commands[0].cmd.clone());
     }
 
-    // Inquire's option prefix (the `>` caret plus a space) eats 2 columns; the
-    // explanation row is indented by another 2 spaces to align under the
-    // command. Wrap both rows at the remaining width so any continuation
-    // lines also start at column 2.
+    // Prefix column (`>` or `-` plus a separating space) eats 2 columns; the
+    // command row is indented 2 spaces under the explanation.
     let cols = terminal_cols();
+    let expl_width = cols.saturating_sub(2).max(20);
     let cmd_width = cols.saturating_sub(2).max(20);
-    let expl_width = cols.saturating_sub(4).max(20);
+    let last = commands.len() - 1;
 
     let options: Vec<String> = commands
         .iter()
-        .map(|c| {
+        .enumerate()
+        .map(|(i, c)| {
+            let expl = wrap_hanging(&c.explanation, expl_width, "  ");
             let cmd = wrap_hanging(&c.cmd, cmd_width, "  ");
-            let expl = wrap_hanging(&c.explanation, expl_width, "    ");
-            format!("{cmd}\x1b[0m\n  \x1b[2m{expl}\x1b[0m")
+            let mut block = format!("{expl}\x1b[0m\n  \x1b[2m{cmd}\x1b[0m");
+            if i == last {
+                block.push_str(LIST_FOOTER_GAP);
+            }
+            block
         })
         .collect();
 
@@ -66,8 +99,8 @@ pub fn pick_command(commands: &[Command]) -> Result<String> {
     let formatter =
         |opt: ListOption<&String>| format!("\x1b[2m{}\x1b[0m", commands[opt.index].explanation);
 
-    let chosen = Select::new("Pick a command:", options)
-        .with_help_message("↑↓ to move, Enter to pick, Esc to cancel")
+    let prompt = choice_prompt("Pick a command:");
+    let chosen = choice_select(&prompt, options)
         .with_formatter(&formatter)
         .raw_prompt()
         .map_err(map_inquire_err)?;
@@ -168,6 +201,13 @@ fn terminal_cols() -> usize {
         .unwrap_or(80)
 }
 
+fn choice_options(mut labels: Vec<String>) -> Vec<String> {
+    if let Some(last) = labels.last_mut() {
+        last.push_str(LIST_FOOTER_GAP);
+    }
+    labels
+}
+
 #[cfg(test)]
 mod tests {
     use super::wrap_hanging;
@@ -215,19 +255,20 @@ mod tests {
 pub fn ask_clarify(question: &str, choices: &[String]) -> Result<String> {
     let mut options: Vec<String> = choices.iter().cloned().collect();
     options.push(OTHER_LABEL.to_string());
+    let options = choice_options(options);
 
-    let chosen = Select::new(question, options.clone())
-        .with_help_message("↑↓ to move, Enter to pick, Esc to cancel")
-        .prompt()
+    let prompt = choice_prompt(question);
+    let chosen = choice_select(&prompt, options)
+        .raw_prompt()
         .map_err(map_inquire_err)?;
 
-    if chosen == OTHER_LABEL {
+    if chosen.index == choices.len() {
         let typed = Text::new("Your answer:")
             .prompt()
             .map_err(map_inquire_err)?;
         Ok(typed)
     } else {
-        Ok(chosen)
+        Ok(choices[chosen.index].clone())
     }
 }
 
@@ -246,23 +287,23 @@ pub fn prompt_oauth_code() -> Result<String> {
 
 /// Interactive picker for `plz login` with no argument.
 pub fn pick_login_action() -> Result<LoginAction> {
-    let options = vec![
-        "Claude account     \x1b[2m— sign in to Claude Pro / Max via the browser\x1b[0m",
-        "Anthropic API key  \x1b[2m— paste an Anthropic API key (sk-ant-…)\x1b[0m",
-        "OpenAI API key     \x1b[2m— paste an OpenAI API key (sk-…)\x1b[0m",
-        "ChatGPT account    \x1b[2m— Sign in with ChatGPT via OAuth\x1b[0m",
-    ];
+    let options = choice_options(vec![
+        "Claude account     \x1b[2m— sign in to Claude Pro / Max via the browser\x1b[0m".into(),
+        "ChatGPT account    \x1b[2m— sign in with ChatGPT via OAuth\x1b[0m".into(),
+        "Anthropic API key  \x1b[2m— paste an Anthropic API key (sk-ant-…)\x1b[0m".into(),
+        "OpenAI API key     \x1b[2m— paste an OpenAI API key (sk-…)\x1b[0m".into(),
+    ]);
 
-    let chosen = Select::new("Sign in with:", options)
-        .with_help_message("↑↓ to move, Enter to pick, Esc to cancel")
+    let prompt = choice_prompt("Sign in with:");
+    let chosen = choice_select(&prompt, options)
         .raw_prompt()
         .map_err(map_inquire_err)?;
 
     Ok(match chosen.index {
         0 => LoginAction::Oauth(Kind::Anthropic),
-        1 => LoginAction::ApiKey(Kind::Anthropic),
-        2 => LoginAction::ApiKey(Kind::OpenAi),
-        3 => LoginAction::Codex,
+        1 => LoginAction::Codex,
+        2 => LoginAction::ApiKey(Kind::Anthropic),
+        3 => LoginAction::ApiKey(Kind::OpenAi),
         _ => unreachable!(),
     })
 }
@@ -285,11 +326,12 @@ pub fn pick_model(kind: Kind, models: &[String], current: &str) -> Result<String
         })
         .collect();
     options.push(OTHER_LABEL.to_string());
+    let options = choice_options(options);
 
     let starting_cursor = models.iter().position(|id| id == current).unwrap_or(0);
 
-    let chosen = Select::new(&format!("Pick a model for {}:", kind.as_str()), options)
-        .with_help_message("↑↓ to move, Enter to pick, Esc to cancel")
+    let prompt = choice_prompt(&format!("Pick a model for {}:", kind.as_str()));
+    let chosen = choice_select(&prompt, options)
         .with_starting_cursor(starting_cursor)
         .raw_prompt()
         .map_err(map_inquire_err)?;

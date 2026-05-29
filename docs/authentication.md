@@ -9,7 +9,9 @@ plz configure
 Or manage the pieces separately:
 
 ```
-plz login                  # interactive provider picker
+plz login                  # interactive picker (Claude account, ChatGPT account,
+                           # Anthropic API key, OpenAI API key)
+plz configure login        # same as `plz login`
 plz login anthropic        # Claude OAuth
 plz login openai           # paste an OpenAI API key
 plz login chatgpt          # ChatGPT OAuth

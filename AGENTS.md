@@ -71,7 +71,7 @@ TOML at the platform config dir (`ProjectDirs::from("dev", "sanglee", "plz")`). 
 
 ## Subcommands
 
-`plz <query>` (default), `plz configure` (guided setup), `plz login [provider]`, `plz logout <provider>`, `plz status`, `plz init [shell]`. Provider aliases: `anthropic`/`claude`, `openai`/`gpt`, `chatgpt`/`codex`/`openai-codex`.
+`plz <query>` (default), `plz configure` (guided setup), `plz configure login` (alias for `plz login`), `plz configure model` (change default model), `plz configure update` (alias for `plz update`), `plz login [provider]`, `plz logout <provider>`, `plz status`, `plz update`, `plz init [shell]`. Provider aliases: `anthropic`/`claude`, `openai`/`gpt`, `chatgpt`/`codex`/`openai-codex`.
 
 ## Release
 

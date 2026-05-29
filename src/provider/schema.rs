@@ -349,7 +349,7 @@ pub fn json_schema() -> Value {
                     "required": ["cmd", "explanation"],
                     "properties": {
                         "cmd": { "type": "string", "description": "The shell command, single line." },
-                        "explanation": { "type": "string", "description": "One short sentence explaining what the command does." }
+                        "explanation": { "type": "string", "description": "Very short label (~5–12 words): gist if alone, or key difference vs. other candidates — not a restatement of the command." }
                     }
                 }
             },

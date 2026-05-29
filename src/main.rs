@@ -10,6 +10,7 @@ mod secret_file;
 mod shell;
 mod spinner;
 mod tui;
+mod update;
 
 use std::process::ExitCode;
 
@@ -23,17 +24,40 @@ use crate::provider::schema::Response;
 
 fn main() -> ExitCode {
     let mut args = cli::Args::parse();
+    let skip_update_check = matches!(
+        args.command,
+        Some(cli::Command::Update)
+            | Some(cli::Command::Init { .. })
+            | Some(cli::Command::Configure {
+                action: Some(cli::ConfigureAction::Update)
+            })
+    );
+    if !skip_update_check {
+        update::maybe_notify();
+    }
     // OAuth flow errors during `plz login` are auth/config problems, not
     // "provider call failed". Map them to exit 3 by tagging the subcommand.
     let is_login_or_logout = matches!(
         args.command,
-        Some(cli::Command::Login { .. }) | Some(cli::Command::Logout { .. })
+        Some(cli::Command::Login { .. })
+            | Some(cli::Command::Logout { .. })
+            | Some(cli::Command::Configure {
+                action: Some(cli::ConfigureAction::Login { .. })
+            })
     );
     let result = match args.command.take() {
-        Some(cli::Command::Configure) => configure_cmd(),
+        Some(cli::Command::Configure { action }) => match action {
+            None => configure_cmd(),
+            Some(cli::ConfigureAction::Login { provider }) => {
+                login_cmd(provider.as_deref()).map(|_| ())
+            }
+            Some(cli::ConfigureAction::Model) => configure_model_cmd(),
+            Some(cli::ConfigureAction::Update) => update::run(),
+        },
         Some(cli::Command::Login { provider }) => login_cmd(provider.as_deref()).map(|_| ()),
         Some(cli::Command::Logout { provider }) => logout_cmd(&provider),
         Some(cli::Command::Status) => oauth::status(),
+        Some(cli::Command::Update) => update::run(),
         Some(cli::Command::Init { shell }) => shell::init(shell.as_deref()),
         None => run_query(args),
     };
@@ -111,33 +135,7 @@ fn configure_cmd() -> Result<()> {
     // step 2 would silently configure the model for some *other* provider
     // the user previously set up.
     cfg.provider = connected.as_str().to_string();
-    let current = cfg.model_for(connected);
-    let cred = provider::auth::credential(connected).ok_or_else(|| {
-        Error::Config(format!(
-            "no credential found for {} after sign-in — run `plz configure` again",
-            connected.as_str()
-        ))
-    })?;
-    eprintln!("\x1b[2m· fetching available models from {}…\x1b[0m", connected.as_str());
-    let models = match provider::models::list(connected, &cred) {
-        Ok(m) => m,
-        Err(e) => {
-            // Fall back so a misconfigured network or a scope-restricted
-            // token doesn't wedge the configure flow. The user still gets a
-            // picker — just with the built-in list instead of live IDs.
-            eprintln!(
-                "\x1b[2m· couldn't list models ({e}); using built-in list\x1b[0m"
-            );
-            provider::models::curated(connected)
-        }
-    };
-    let model = tui::pick_model(connected, &models, &current)?;
-    match connected {
-        Kind::Anthropic => cfg.anthropic_model = model,
-        Kind::OpenAi => cfg.openai_model = model,
-        Kind::Codex => cfg.codex_model = model,
-    }
-    config::save(&cfg)?;
+    pick_and_save_model(connected, &mut cfg)?;
 
     eprintln!();
     eprintln!("\x1b[1m3. Enable auto-prefill\x1b[0m");
@@ -179,6 +177,51 @@ fn configure_cmd() -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn configure_model_cmd() -> Result<()> {
+    let mut cfg = config::load_or_init()?;
+    let kind = cfg.kind().ok_or_else(|| {
+        Error::Config(format!(
+            "config has unknown provider {:?} — edit config.toml or run `plz configure`",
+            cfg.provider
+        ))
+    })?;
+    pick_and_save_model(kind, &mut cfg)?;
+    eprintln!(
+        "Default model for {} set to {}.",
+        kind.as_str(),
+        cfg.model_for(kind)
+    );
+    Ok(())
+}
+
+fn pick_and_save_model(kind: Kind, cfg: &mut config::Config) -> Result<()> {
+    let current = cfg.model_for(kind);
+    let cred = provider::auth::credential(kind).ok_or_else(|| {
+        Error::Config(format!(
+            "no credential found for {} — run `plz login {}` first",
+            kind.as_str(),
+            kind.as_str()
+        ))
+    })?;
+    eprintln!("\x1b[2m· fetching available models from {}…\x1b[0m", kind.as_str());
+    let models = match provider::models::list(kind, &cred) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!(
+                "\x1b[2m· couldn't list models ({e}); using built-in list\x1b[0m"
+            );
+            provider::models::curated(kind)
+        }
+    };
+    let model = tui::pick_model(kind, &models, &current)?;
+    match kind {
+        Kind::Anthropic => cfg.anthropic_model = model,
+        Kind::OpenAi => cfg.openai_model = model,
+        Kind::Codex => cfg.codex_model = model,
+    }
+    config::save(cfg)
 }
 
 fn run_query(args: cli::Args) -> Result<()> {

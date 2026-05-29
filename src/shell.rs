@@ -7,7 +7,7 @@
 //! onto the next prompt's edit buffer — zsh's `print -z` for zsh, a DSR /
 //! readline-macro polyfill for bash.
 //!
-//! The wrapper skips `plz` subcommands (`login`, `status`, `init`, …) so
+//! The wrapper skips `plz` subcommands (`login`, `status`, `init`, `update`, …) so
 //! `eval "$(plz init …)"` and `plz --help` pass straight through.
 
 use std::fs;
@@ -23,7 +23,7 @@ const ZSH: &str = r#"# plz shell integration (zsh) — add to ~/.zshrc:  eval "$
 # edit, and run — instead of being printed for you to copy.
 plz() {
   case "$1" in
-  ''|init|configure|login|logout|status|-h|--help|-V|--version)
+  ''|init|configure|login|logout|status|update|-h|--help|-V|--version)
     command plz "$@"
     return $?
     ;;
@@ -44,7 +44,7 @@ const BASH: &str = r#"# plz shell integration (bash) — add to ~/.bashrc:  eval
 # review, edit, and run — instead of being printed for you to copy.
 plz() {
   case "$1" in
-  ''|init|configure|login|logout|status|-h|--help|-V|--version)
+  ''|init|configure|login|logout|status|update|-h|--help|-V|--version)
     command plz "$@"
     return $?
     ;;

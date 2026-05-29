@@ -47,7 +47,13 @@ pub enum Command {
     /// Guided setup: connect a provider, then install the shell wrapper that
     /// auto-prefills the next prompt with the command you pick. Run this once
     /// after installing plz.
-    Configure,
+    ///
+    /// Subcommands `login`, `model`, and `update` adjust one piece without
+    /// rerunning the full wizard.
+    Configure {
+        #[command(subcommand)]
+        action: Option<ConfigureAction>,
+    },
     /// Sign in to a provider.
     ///
     /// `anthropic` runs the Claude OAuth browser flow; `openai` prompts you to
@@ -67,6 +73,8 @@ pub enum Command {
     },
     /// Print sign-in status for providers.
     Status,
+    /// Upgrade plz to the latest release.
+    Update,
     /// Print a shell snippet that pre-fills the next prompt with the command
     /// you pick, instead of just printing it for you to copy.
     ///
@@ -78,6 +86,20 @@ pub enum Command {
         #[arg(value_name = "zsh|bash")]
         shell: Option<String>,
     },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ConfigureAction {
+    /// Sign in to a provider (alias for `plz login`).
+    Login {
+        /// `anthropic` (also `claude`), `openai`, or `chatgpt` (also `codex`). Omit to pick interactively.
+        #[arg(value_name = "anthropic|openai|chatgpt")]
+        provider: Option<String>,
+    },
+    /// Change the default model for the configured provider.
+    Model,
+    /// Upgrade plz to the latest release (alias for `plz update`).
+    Update,
 }
 
 impl Args {

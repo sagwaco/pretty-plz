@@ -1,0 +1,27 @@
+{
+  "name": "@sagwaco/plz",
+  "version": "0.1.0",
+  "description": "Natural-language to shell-command CLI",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sagwaco/pretty-plz.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sagwaco/pretty-plz/issues"
+  },
+  "homepage": "https://github.com/sagwaco/pretty-plz#readme",
+  "bin": {
+    "plz": "bin/plz.js"
+  },
+  "files": [
+    "bin",
+    "scripts"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -24,7 +24,7 @@ pub struct Spinner {
 }
 
 impl Spinner {
-    /// Start an animated spinner labelled `<label>:` on stderr. The label is
+    /// Start an animated spinner labelled `<label>` on stderr. The label is
     /// usually the model ID being queried (e.g. `claude-haiku-4-5`).
     pub fn start(label: impl Into<String>) -> Self {
         let label = label.into();
@@ -46,7 +46,7 @@ impl Spinner {
             while !stop_c.load(Ordering::Relaxed) {
                 let frame = FRAMES[i % FRAMES.len()];
                 let mut e = io::stderr().lock();
-                let _ = write!(e, "\r\x1b[2K\x1b[2m{frame} {label}:\x1b[0m");
+                let _ = write!(e, "\r\x1b[2K\x1b[2m{frame} {label}\x1b[0m");
                 let _ = e.flush();
                 drop(e);
                 thread::sleep(Duration::from_millis(FRAME_MS));
