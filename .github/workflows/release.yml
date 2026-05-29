@@ -82,9 +82,10 @@ jobs:
     name: publish to npm
     needs: release
     runs-on: ubuntu-latest
+    environment: release-env # npm OIDC trusted publisher is scoped to this environment
     permissions:
       contents: read
-      id-token: write # npm provenance attestation
+      id-token: write # OIDC trusted publishing (provenance is generated automatically)
     steps:
       - uses: actions/checkout@v4
 
@@ -93,22 +94,24 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org
 
+      # Trusted publishing (OIDC) requires npm >= 11.5.1; Node 20 ships npm 10.
+      - run: npm install -g npm@latest
+
       - name: Publish @sagwaco/plz
         working-directory: npm/pretty-plz
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           version="${GITHUB_REF_NAME#v}"
           # Prereleases (vX.Y.Z-rc1) go to the `next` dist-tag, not `latest`.
           if [[ "$version" == *-* ]]; then dist=next; else dist=latest; fi
           npm pkg set version="$version"
-          npm publish --provenance --access public --tag "$dist"
+          npm publish --access public --tag "$dist"
 
   homebrew:
     name: update homebrew tap
     needs: release
     if: ${{ !contains(github.ref_name, '-') }} # skip prereleases
     runs-on: ubuntu-latest
+    environment: release-env # HOMEBREW_TAP_TOKEN is an environment secret here
     permissions:
       contents: read # read this repo's release assets via gh
     steps:

@@ -46,41 +46,42 @@ tag's version to npm/Homebrew.
 
 ## One-time setup
 
-These secrets must exist on the **pretty-plz** repo (Settings → Secrets and
-variables → Actions). Without them the `npm` / `homebrew` jobs fail.
+Both publish jobs run in the **`release-env`** GitHub Actions environment on the
+pretty-plz repo. This is already configured — the section documents it.
 
-### `NPM_TOKEN` — npm publish
+### npm — OIDC trusted publishing (no token)
 
-npm requires 2FA for publishing, so interactive OTP won't work in CI. Use a
-token that bypasses it:
+npm publishes via **OpenID Connect**: GitHub Actions mints a short-lived OIDC
+token, npm verifies it against a trusted-publisher config, and no long-lived
+token is stored anywhere. Provenance attestations are generated automatically.
 
-1. [npmjs.com](https://www.npmjs.com/) → Access Tokens → **Generate New Token**
-   → **Granular Access Token** (or classic **Automation** token).
-2. Scope: read/write on `@sagwaco/plz` (or the whole `@sagwaco` scope).
-3. Enable **Bypass 2FA** (granular) — automation tokens bypass it by default.
-4. Add it as repo secret **`NPM_TOKEN`**.
+Configured on npmjs.com (`@sagwaco/plz` → Settings → **Trusted Publisher**):
 
-Provenance is enabled (`--provenance`, `id-token: write`). It needs the repo to
-stay **public** and `package.json`'s `repository.url` to match the repo — both
-already true.
+- Repository: `sagwaco/pretty-plz`
+- Workflow: `release.yml`
+- Environment: `release-env`
 
-### `HOMEBREW_TAP_TOKEN` — push to the tap
+The job requires `permissions: id-token: write`, `environment: release-env`, and
+npm ≥ 11.5.1 — it runs `npm install -g npm@latest` first, since Node 20 ships
+npm 10. The repo must stay **public**.
+
+> If you rename the workflow file, move the job out of `release-env`, or change
+> the package name, update the trusted-publisher config to match — otherwise
+> publishes are rejected.
+
+### `HOMEBREW_TAP_TOKEN` — push to the tap (environment secret)
 
 The default `GITHUB_TOKEN` can't push to another repo, so the `homebrew` job
-authenticates to `sagwaco/homebrew-tap` with its own token:
+authenticates to `sagwaco/homebrew-tap` with a fine-grained PAT stored as an
+**environment secret** on `release-env`:
 
-1. GitHub → Settings → Developer settings → **Fine-grained personal access
-   tokens** → Generate new token.
-2. Resource owner: `sagwaco`. Repository access: **Only select repositories** →
-   `sagwaco/homebrew-tap`.
-3. Permissions: **Contents → Read and write**.
-4. Add it as repo secret **`HOMEBREW_TAP_TOKEN`**.
+- Fine-grained PAT, resource owner `sagwaco`, scoped to **only**
+  `sagwaco/homebrew-tap`, permission **Contents: Read and write**.
+- Stored as the `release-env` environment secret **`HOMEBREW_TAP_TOKEN`** — which
+  is why the `homebrew` job declares `environment: release-env`.
 
-Fine-grained PATs expire (max 1 year). For a no-expiry alternative, add an SSH
-**deploy key** with write access to the tap and switch the job's checkout to it.
-
-The main repo must stay **public** (npm provenance and the Homebrew/install.sh
-download paths assume public release assets).
+Fine-grained PATs expire (max 1 year) — rotate before then, or switch to an SSH
+deploy key with write access for no expiry.
 
 ---
 
@@ -126,10 +127,11 @@ delete `<config_dir>/update_check.json` to force a recheck).
 
 | Symptom | Fix |
 |---------|-----|
-| `npm` job: `E403 … two-factor authentication … required` | The token doesn't bypass 2FA — regenerate as an Automation token or a Granular token with **Bypass 2FA**, update `NPM_TOKEN`. |
-| `npm` job: `E403 … you do not have permission to publish` | Token isn't scoped to `@sagwaco/plz`, or the `@sagwaco` org/your membership is missing. |
+| `npm` job: OIDC / `401` / `Unable to authenticate` | Trusted-publisher mismatch — confirm npmjs.com lists repo `sagwaco/pretty-plz`, workflow `release.yml`, environment `release-env`, and the job has `id-token: write`. |
+| `npm` job: OIDC unsupported / `EUSAGE` | npm too old — the `npm install -g npm@latest` step must run before publish (needs npm ≥ 11.5.1). |
 | `npm` job: `E402` / version exists | npm can't republish a version. Cut a new patch (`scripts/release.sh patch`); never reuse a version. |
-| `homebrew` job: `Permission … denied` / 403 on push | `HOMEBREW_TAP_TOKEN` missing, expired, or not scoped to `homebrew-tap` with Contents:write. |
+| `npm` / `homebrew` job stuck on "Waiting" | `release-env` has protection rules (required reviewers) — approve the run, or relax the environment rule. |
+| `homebrew` job: `Permission … denied` / 403 on push | `HOMEBREW_TAP_TOKEN` missing/expired, not scoped to `homebrew-tap` with Contents:write, or the job is missing `environment: release-env`. |
 | `homebrew` job: `missing sha256 for …` | A build target didn't produce its tarball — check the `build` matrix. |
 | `release.sh`: `working tree is dirty` / `not on main` / `not in sync` | Commit/stash, switch to `main`, or `git pull` first — the script refuses to release from an unclean state. |
 
@@ -145,4 +147,4 @@ delete `<config_dir>/update_check.json` to force a recheck).
 | Homebrew formula (source of truth) | [`packaging/homebrew/plz.rb.tmpl`](../packaging/homebrew/plz.rb.tmpl) → rendered to the tap |
 | Homebrew tap (published) | [github.com/sagwaco/homebrew-tap](https://github.com/sagwaco/homebrew-tap) → `Formula/plz.rb` |
 | npm package | `npm/pretty-plz/` → registry `@sagwaco/plz` |
-| Required secrets | `NPM_TOKEN`, `HOMEBREW_TAP_TOKEN` |
+| CI auth | npm OIDC trusted publishing + `HOMEBREW_TAP_TOKEN`, both via the `release-env` environment |
