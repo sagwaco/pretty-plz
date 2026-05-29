@@ -78,8 +78,8 @@ impl OpenAi {
 }
 
 impl Provider for OpenAi {
-    fn name(&self) -> &'static str {
-        "openai"
+    fn model(&self) -> &str {
+        &self.model
     }
 
     fn complete(&self, turns: &[Turn]) -> Result<Response> {

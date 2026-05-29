@@ -50,8 +50,8 @@ impl Codex {
 }
 
 impl Provider for Codex {
-    fn name(&self) -> &'static str {
-        "chatgpt"
+    fn model(&self) -> &str {
+        &self.model
     }
 
     fn complete(&self, turns: &[Turn]) -> Result<Response> {

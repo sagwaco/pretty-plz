@@ -8,6 +8,7 @@ mod prompt;
 mod provider;
 mod secret_file;
 mod shell;
+mod spinner;
 mod tui;
 
 use std::process::ExitCode;
@@ -210,8 +211,10 @@ fn run_query(args: cli::Args) -> Result<()> {
 
     let mut turns: Vec<Turn> = vec![Turn::User(first_user)];
 
-    eprintln!("\x1b[2m· asking {}…\x1b[0m", provider.name());
-    let first = provider.complete(&turns)?;
+    let spin = spinner::Spinner::start(provider.model().to_string());
+    let first = provider.complete(&turns);
+    spin.stop();
+    let first = first?;
 
     let final_response = match first {
         Response::Commands { .. } => first,
@@ -222,8 +225,10 @@ fn run_query(args: cli::Args) -> Result<()> {
             let answer = tui::ask_clarify(question, choices)?;
             turns.push(Turn::Assistant(first.clone()));
             turns.push(Turn::ClarifyAnswer(answer));
-            eprintln!("\x1b[2m· asking {} again…\x1b[0m", provider.name());
-            let second = provider.complete(&turns)?;
+            let spin = spinner::Spinner::start(provider.model().to_string());
+            let second = provider.complete(&turns);
+            spin.stop();
+            let second = second?;
             match second {
                 Response::Commands { .. } => second,
                 Response::Clarify { .. } => return Err(Error::ClarifyLoop),

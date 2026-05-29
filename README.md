@@ -5,12 +5,18 @@ Natural-language to shell-command CLI. Ask for what you want, choose from up to
 
 ```
 $ plz find the biggest files in this folder
-· asking anthropic...
+⠹ claude-haiku-4-5:
 ? Pick a command:
 > du -ah . | sort -rh | head -n 10
+    list every file's size and show the 10 largest
   find . -type f -exec du -h {} + | sort -rh | head
+    walk the tree with find and surface the biggest files
   du -sh */ | sort -rh
+    summarize each top-level subdirectory and sort by size
 ```
+
+`plz` biases toward a single best command — multiple choices only appear when
+the alternatives meaningfully differ (different tools, tradeoffs, or behavior).
 
 The chosen command is printed to stdout, so it works with command substitution:
 
@@ -27,10 +33,8 @@ for you to copy:
 
 ```
 $ plz print the most common filetype here and in subdirectories
-· asking anthropic…
-? Pick a command:
-> find . -type f -name '*.*' | rev | cut -d. -f1 | rev | sort | uniq -c | sort -rn | head -1 | awk '{print $2}'
-  ...
+⠹ claude-haiku-4-5:
+    walk the tree and pick the extension with the highest count
 $ find . -type f -name '*.*' | rev | cut -d. -f1 | rev | sort | uniq -c | sort -rn | head -1 | awk '{print $2}'▮
 ```
 

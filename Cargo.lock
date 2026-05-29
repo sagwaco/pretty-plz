@@ -586,6 +586,7 @@ dependencies = [
  "anyhow",
  "base64",
  "clap",
+ "crossterm",
  "directories",
  "getrandom",
  "inquire",

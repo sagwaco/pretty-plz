@@ -27,15 +27,36 @@ fn map_inquire_err(e: InquireError) -> Error {
 
 /// Render a numbered list of candidate commands, return the chosen `cmd`
 /// string. The TUI renders to /dev/tty; stdout stays clean.
+///
+/// Each option is shown on two lines — the command on top, a dim
+/// explanation indented underneath so it lines up with the start of the
+/// command. Long commands and explanations are pre-wrapped with a hanging
+/// 2-space indent so soft-wrapped continuations also start past the `>`
+/// caret instead of bleeding back to column 0. The embedded `\x1b[0m`
+/// after the command cancels any outer "selected option" style (default
+/// cyan) so the explanation always renders as dim default-color,
+/// regardless of whether its row is highlighted.
 pub fn pick_command(commands: &[Command]) -> Result<String> {
     if commands.len() == 1 {
         eprintln!("\x1b[2m{}\x1b[0m", commands[0].explanation);
         return Ok(commands[0].cmd.clone());
     }
 
+    // Inquire's option prefix (the `>` caret plus a space) eats 2 columns; the
+    // explanation row is indented by another 2 spaces to align under the
+    // command. Wrap both rows at the remaining width so any continuation
+    // lines also start at column 2.
+    let cols = terminal_cols();
+    let cmd_width = cols.saturating_sub(2).max(20);
+    let expl_width = cols.saturating_sub(4).max(20);
+
     let options: Vec<String> = commands
         .iter()
-        .map(|c| format!("{}   \x1b[2m— {}\x1b[0m", c.cmd, c.explanation))
+        .map(|c| {
+            let cmd = wrap_hanging(&c.cmd, cmd_width, "  ");
+            let expl = wrap_hanging(&c.explanation, expl_width, "    ");
+            format!("{cmd}\x1b[0m\n  \x1b[2m{expl}\x1b[0m")
+        })
         .collect();
 
     // The chosen command is pushed into the shell's input buffer (see
@@ -52,6 +73,141 @@ pub fn pick_command(commands: &[Command]) -> Result<String> {
         .map_err(map_inquire_err)?;
 
     Ok(commands[chosen.index].cmd.clone())
+}
+
+/// Wrap `text` to `width` columns, prefixing every wrapped continuation line
+/// (i.e. all lines after the first) with `cont_indent`. Prefers breaking on
+/// whitespace but will hard-split a token that exceeds the line budget so a
+/// single long argument never blows out the layout. Width is measured in
+/// chars, not unicode display cells — good enough for the ASCII-heavy
+/// commands `plz` returns; double-width glyphs may wrap one cell short.
+fn wrap_hanging(text: &str, width: usize, cont_indent: &str) -> String {
+    let indent_w = cont_indent.chars().count();
+    if width == 0 || width <= indent_w || text.chars().count() <= width {
+        return text.to_string();
+    }
+
+    let mut lines: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut col = 0usize;
+    let mut at_line_start = true;
+
+    let hard_split = |word: &str,
+                      lines: &mut Vec<String>,
+                      current: &mut String,
+                      col: &mut usize| {
+        let mut iter = word.chars();
+        loop {
+            let mut remaining = width.saturating_sub(*col);
+            if remaining == 0 {
+                lines.push(std::mem::take(current));
+                current.push_str(cont_indent);
+                *col = indent_w;
+                remaining = width - indent_w;
+            }
+            let taken: String = iter.by_ref().take(remaining).collect();
+            if taken.is_empty() {
+                break;
+            }
+            *col += taken.chars().count();
+            current.push_str(&taken);
+        }
+    };
+
+    for word in text.split(' ') {
+        if word.is_empty() {
+            // Collapse consecutive spaces — `plz` commands don't have
+            // semantically meaningful runs of spaces, so this keeps the
+            // wrap math simple.
+            continue;
+        }
+        let wlen = word.chars().count();
+
+        if at_line_start {
+            if wlen <= width.saturating_sub(col) {
+                current.push_str(word);
+                col += wlen;
+            } else {
+                hard_split(word, &mut lines, &mut current, &mut col);
+            }
+            at_line_start = false;
+            continue;
+        }
+
+        // Subsequent word on the current line — needs a separator space.
+        if 1 + wlen <= width.saturating_sub(col) {
+            current.push(' ');
+            current.push_str(word);
+            col += 1 + wlen;
+            continue;
+        }
+
+        // Doesn't fit. Wrap to a continuation line and place the word there.
+        lines.push(std::mem::take(&mut current));
+        current.push_str(cont_indent);
+        col = indent_w;
+        if wlen <= width - indent_w {
+            current.push_str(word);
+            col += wlen;
+        } else {
+            hard_split(word, &mut lines, &mut current, &mut col);
+        }
+    }
+    if !current.is_empty() {
+        lines.push(current);
+    }
+    lines.join("\n")
+}
+
+/// Width of the controlling terminal in columns. Falls back to 80 when the
+/// query fails (non-TTY, redirected stderr) — that's the conventional
+/// default and roughly matches what every CI / pipe scenario will assume.
+fn terminal_cols() -> usize {
+    crossterm::terminal::size()
+        .map(|(w, _)| w as usize)
+        .unwrap_or(80)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::wrap_hanging;
+
+    #[test]
+    fn short_text_is_unchanged() {
+        assert_eq!(wrap_hanging("ls -lah", 40, "  "), "ls -lah");
+    }
+
+    #[test]
+    fn wraps_on_word_boundary_with_indent() {
+        let out = wrap_hanging("alpha bravo charlie delta", 12, "  ");
+        // First line stays at column 0; subsequent lines get the 2-space
+        // indent so they line up under whatever caller prefixed them.
+        assert_eq!(out, "alpha bravo\n  charlie\n  delta");
+    }
+
+    #[test]
+    fn hard_splits_oversized_token() {
+        let out = wrap_hanging("aaaaaaaaaaaaaaa", 5, "  ");
+        // Token longer than width is split across lines; continuation lines
+        // start past the indent.
+        assert_eq!(out, "aaaaa\n  aaa\n  aaa\n  aaa\n  a");
+    }
+
+    #[test]
+    fn wraps_a_realistic_long_command() {
+        let cmd =
+            "find . -type f -name '*.*' | rev | cut -d. -f1 | rev | sort | uniq -c | sort -rn";
+        let out = wrap_hanging(cmd, 30, "  ");
+        for (i, line) in out.lines().enumerate() {
+            assert!(
+                line.chars().count() <= 30,
+                "line {i} ({line:?}) wider than 30"
+            );
+            if i > 0 {
+                assert!(line.starts_with("  "), "continuation line missing indent: {line:?}");
+            }
+        }
+    }
 }
 
 /// Ask a clarifying question with multiple-choice answers + a freeform escape

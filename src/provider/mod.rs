@@ -44,7 +44,9 @@ pub enum Turn {
 }
 
 pub trait Provider {
-    fn name(&self) -> &'static str;
+    /// The model ID this provider was built with — used for the spinner
+    /// label so the user sees which model is being queried.
+    fn model(&self) -> &str;
     fn complete(&self, turns: &[Turn]) -> Result<Response>;
 }
 

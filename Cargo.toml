@@ -17,6 +17,9 @@ toml = "0.8"
 directories = "5"
 ureq = { version = "2", default-features = false, features = ["tls", "json"] }
 inquire = "0.7"
+# Pinned to the version inquire pulls in so the build doesn't compile two
+# copies of crossterm — used only for `terminal::size()` in pick_command.
+crossterm = "0.25"
 thiserror = "1"
 anyhow = "1"
 sha2 = "0.10"

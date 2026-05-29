@@ -108,8 +108,8 @@ impl Anthropic {
 }
 
 impl Provider for Anthropic {
-    fn name(&self) -> &'static str {
-        "anthropic"
+    fn model(&self) -> &str {
+        &self.model
     }
 
     fn complete(&self, turns: &[Turn]) -> Result<Response> {
