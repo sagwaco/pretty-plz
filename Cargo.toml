@@ -1,0 +1,32 @@
+[package]
+name = "plz"
+version = "0.1.0"
+edition = "2024"
+description = "Natural-language to shell-command CLI"
+license = "Apache-2.0"
+
+[[bin]]
+name = "plz"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive", "env"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+directories = "5"
+ureq = { version = "2", default-features = false, features = ["tls", "json"] }
+inquire = "0.7"
+thiserror = "1"
+anyhow = "1"
+sha2 = "0.10"
+base64 = "0.22"
+getrandom = "0.2"
+urlencoding = "2"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "abort"
+opt-level = 3
