@@ -75,6 +75,12 @@ pub enum Command {
     Status,
     /// Upgrade plz to the latest release.
     Update,
+    /// Remove plz: forget credentials, shell integration, and the binary.
+    Uninstall {
+        /// Skip the confirmation prompt.
+        #[arg(short = 'y', long = "yes")]
+        yes: bool,
+    },
     /// Print a shell snippet that pre-fills the next prompt with the command
     /// you pick, instead of just printing it for you to copy.
     ///

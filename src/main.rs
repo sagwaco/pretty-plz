@@ -10,6 +10,7 @@ mod secret_file;
 mod shell;
 mod spinner;
 mod tui;
+mod uninstall;
 mod update;
 
 use std::process::ExitCode;
@@ -27,6 +28,7 @@ fn main() -> ExitCode {
     let skip_update_check = matches!(
         args.command,
         Some(cli::Command::Update)
+            | Some(cli::Command::Uninstall { .. })
             | Some(cli::Command::Init { .. })
             | Some(cli::Command::Configure {
                 action: Some(cli::ConfigureAction::Update)
@@ -58,6 +60,7 @@ fn main() -> ExitCode {
         Some(cli::Command::Logout { provider }) => logout_cmd(&provider),
         Some(cli::Command::Status) => oauth::status(),
         Some(cli::Command::Update) => update::run(),
+        Some(cli::Command::Uninstall { yes }) => uninstall::run(yes),
         Some(cli::Command::Init { shell }) => shell::init(shell.as_deref()),
         None => run_query(args),
     };

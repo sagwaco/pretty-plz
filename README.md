@@ -84,6 +84,7 @@ Available commands:
 plz login                  # login to an LLM service
 plz status                 # show sign-in status
 plz update                 # upgrade to the latest release
+plz uninstall              # remove plz, credentials, and shell integration
 plz configure              # full guided setup
   plz configure login        # sign in (alias for `plz login`)
   plz configure model        # change the default model

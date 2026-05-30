@@ -17,6 +17,8 @@ plz login openai           # paste an OpenAI API key
 plz login chatgpt          # ChatGPT OAuth
 plz status
 plz logout <provider>
+plz uninstall              # remove everything (credentials, shell hooks, binary)
+plz uninstall -y           # skip confirmation
 ```
 
 You can also use environment variables:

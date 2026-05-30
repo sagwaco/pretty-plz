@@ -23,7 +23,7 @@ const ZSH: &str = r#"# plz shell integration (zsh) — add to ~/.zshrc:  eval "$
 # edit, and run — instead of being printed for you to copy.
 plz() {
   case "$1" in
-  ''|init|configure|login|logout|status|update|-h|--help|-V|--version)
+  ''|init|configure|login|logout|status|update|uninstall|-h|--help|-V|--version)
     command plz "$@"
     return $?
     ;;
@@ -44,7 +44,7 @@ const BASH: &str = r#"# plz shell integration (bash) — add to ~/.bashrc:  eval
 # review, edit, and run — instead of being printed for you to copy.
 plz() {
   case "$1" in
-  ''|init|configure|login|logout|status|update|-h|--help|-V|--version)
+  ''|init|configure|login|logout|status|update|uninstall|-h|--help|-V|--version)
     command plz "$@"
     return $?
     ;;
@@ -185,6 +185,111 @@ pub fn plz_on_path() -> bool {
 /// reversed: interactive non-login shells read `.bashrc`, and `.bash_profile`
 /// (if it exists at all) typically sources it. Target the file each platform
 /// reads by default.
+const INSTALLER_BEGIN: &str = "# >>> plz installer >>>";
+const INSTALLER_END: &str = "# <<< plz installer <<<";
+
+/// Shell rc files that may contain plz integration or installer PATH blocks.
+pub fn profiles_to_clean() -> Result<Vec<PathBuf>> {
+    let home = std::env::var_os("HOME")
+        .ok_or_else(|| Error::Config("$HOME is not set; can't locate your rc files".into()))?;
+    let home = PathBuf::from(home);
+    Ok(vec![
+        home.join(".zshrc"),
+        home.join(".bashrc"),
+        home.join(".bash_profile"),
+        home.join(".zprofile"),
+        home.join(".profile"),
+    ])
+}
+
+/// Remove plz shell-integration lines and curl-installer PATH blocks from rc files.
+pub fn remove_integration_from_profiles() -> Result<Vec<PathBuf>> {
+    let mut modified = Vec::new();
+    for path in profiles_to_clean()? {
+        if !path.exists() {
+            continue;
+        }
+        let content = fs::read_to_string(&path).map_err(|e| {
+            Error::Config(format!("failed to read {}: {e}", path.display()))
+        })?;
+        let (new_content, changed) = clean_profile_content(&content);
+        if !changed {
+            continue;
+        }
+        fs::write(&path, &new_content).map_err(|e| {
+            Error::Config(format!("failed to write {}: {e}", path.display()))
+        })?;
+        modified.push(path);
+    }
+    Ok(modified)
+}
+
+fn clean_profile_content(content: &str) -> (String, bool) {
+    let (content, path_changed) = strip_installer_path_block(content);
+    let (content, shell_changed) = strip_shell_integration_lines(&content);
+    (content, path_changed || shell_changed)
+}
+
+fn strip_installer_path_block(content: &str) -> (String, bool) {
+    let mut changed = false;
+    let mut in_block = false;
+    let mut kept: Vec<&str> = Vec::new();
+    for line in content.lines() {
+        if line == INSTALLER_BEGIN {
+            in_block = true;
+            changed = true;
+            continue;
+        }
+        if in_block {
+            if line == INSTALLER_END {
+                in_block = false;
+            }
+            continue;
+        }
+        kept.push(line);
+    }
+    (join_lines(&kept, content.ends_with('\n')), changed)
+}
+
+fn strip_shell_integration_lines(content: &str) -> (String, bool) {
+    let mut changed = false;
+    let kept: Vec<&str> = content
+        .lines()
+        .filter(|line| {
+            if is_plz_shell_line(line) {
+                changed = true;
+                false
+            } else {
+                true
+            }
+        })
+        .collect();
+    (join_lines(&kept, content.ends_with('\n')), changed)
+}
+
+fn is_plz_shell_line(line: &str) -> bool {
+    let t = line.trim();
+    t.starts_with("# plz shell integration")
+        || t.contains("plz init")
+        || (t.contains("command -v plz") && t.contains("plz init"))
+}
+
+fn join_lines(lines: &[&str], trailing_newline: bool) -> String {
+    if lines.is_empty() {
+        return String::new();
+    }
+    let mut out = lines.join("\n");
+    if trailing_newline {
+        out.push('\n');
+    }
+    out
+}
+
+/// Path to the rc file for the current `$SHELL` (best-effort).
+pub fn active_rc_path() -> Result<PathBuf> {
+    rc_path_for(&detect_shell()?)
+}
+
 fn rc_path_for(shell: &str) -> Result<PathBuf> {
     let home = std::env::var_os("HOME")
         .ok_or_else(|| Error::Config("$HOME is not set; can't locate your rc file".into()))?;
@@ -199,4 +304,47 @@ fn rc_path_for(shell: &str) -> Result<PathBuf> {
         }
     };
     Ok(PathBuf::from(home).join(rc_name))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        clean_profile_content, strip_installer_path_block, strip_shell_integration_lines,
+    };
+
+    #[test]
+    fn strip_shell_integration_lines_removes_wrapper() {
+        let input = "# my config\n\
+# plz shell integration — auto-prefills the next prompt with your chosen command\n\
+command -v plz >/dev/null 2>&1 && eval \"$(plz init zsh)\"\n\
+alias ll='ls -la'\n";
+        let (out, changed) = strip_shell_integration_lines(input);
+        assert!(changed);
+        assert_eq!(out, "# my config\nalias ll='ls -la'\n");
+    }
+
+    #[test]
+    fn strip_installer_path_block_removes_marked_block() {
+        let input = "export FOO=1\n\
+# >>> plz installer >>>\n\
+export PATH=\"$HOME/.local/bin:$PATH\"\n\
+# <<< plz installer <<<\n\
+export BAR=2\n";
+        let (out, changed) = strip_installer_path_block(input);
+        assert!(changed);
+        assert_eq!(out, "export FOO=1\nexport BAR=2\n");
+    }
+
+    #[test]
+    fn clean_profile_content_strips_both() {
+        let input = "# >>> plz installer >>>\n\
+export PATH=\"$HOME/.local/bin:$PATH\"\n\
+# <<< plz installer <<<\n\
+# plz shell integration\n\
+eval \"$(plz init bash)\"\n\
+true\n";
+        let (out, changed) = clean_profile_content(input);
+        assert!(changed);
+        assert_eq!(out, "true\n");
+    }
 }

@@ -64,14 +64,14 @@ Single source of truth for structured output, fed to **both** providers. `Respon
 Builds the environment block (OS, shell, pwd, directory listing capped at 50 entries). Filenames are untrusted, so the listing is wrapped in a **per-call randomized fence** (`===PLZ-UNTRUSTED-<rand>===`) that a malicious filename can't forge, and the system prompt instructs the model to treat fenced content as data.
 
 ### Shell integration (`shell.rs`)
-`plz init <zsh|bash>` prints a wrapper function; `plz configure` appends `eval "$(plz init …)"` to the rc file (`.zshrc`, or `.bash_profile` on macOS / `.bashrc` on Linux). The wrapper captures plz's stdout and pushes it onto the next prompt — zsh `print -z`, bash via a DSR / readline-macro polyfill. It deliberately **skips subcommands** (`login`, `status`, `init`, …) so those pass straight through.
+`plz init <zsh|bash>` prints a wrapper function; `plz configure` appends `eval "$(plz init …)"` to the rc file (`.zshrc`, or `.bash_profile` on macOS / `.bashrc` on Linux). The wrapper captures plz's stdout and pushes it onto the next prompt — zsh `print -z`, bash via a DSR / readline-macro polyfill. It deliberately **skips subcommands** (`login`, `status`, `init`, `uninstall`, …) so those pass straight through.
 
 ### Config (`config.rs`)
 TOML at the platform config dir (`ProjectDirs::from("dev", "sanglee", "plz")`). First run auto-detects a provider from available credentials and writes defaults. Saves are atomic (temp + rename).
 
 ## Subcommands
 
-`plz <query>` (default), `plz configure` (guided setup), `plz configure login` (alias for `plz login`), `plz configure model` (change default model), `plz configure update` (alias for `plz update`), `plz login [provider]`, `plz logout <provider>`, `plz status`, `plz update`, `plz init [shell]`. Provider aliases: `anthropic`/`claude`, `openai`/`gpt`, `chatgpt`/`codex`/`openai-codex`.
+`plz <query>` (default), `plz configure` (guided setup), `plz configure login` (alias for `plz login`), `plz configure model` (change default model), `plz configure update` (alias for `plz update`), `plz login [provider]`, `plz logout <provider>`, `plz status`, `plz update`, `plz uninstall [-y]`, `plz init [shell]`. Provider aliases: `anthropic`/`claude`, `openai`/`gpt`, `chatgpt`/`codex`/`openai-codex`.
 
 ## Release
 

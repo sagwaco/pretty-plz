@@ -29,6 +29,18 @@ pub enum InstallMethod {
     Unknown,
 }
 
+impl std::fmt::Display for InstallMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InstallMethod::Curl => write!(f, "curl / install.sh"),
+            InstallMethod::Homebrew => write!(f, "Homebrew"),
+            InstallMethod::Npm => write!(f, "npm"),
+            InstallMethod::Cargo => write!(f, "cargo"),
+            InstallMethod::Unknown => write!(f, "unknown"),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct UpdateCache {
     checked_at: u64,

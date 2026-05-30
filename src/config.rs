@@ -40,8 +40,12 @@ fn project_dirs() -> Result<ProjectDirs> {
         .ok_or_else(|| Error::Config("could not determine config directory".into()))
 }
 
+pub fn config_dir() -> Result<PathBuf> {
+    Ok(project_dirs()?.config_dir().to_path_buf())
+}
+
 pub fn config_path() -> Result<PathBuf> {
-    Ok(project_dirs()?.config_dir().join("config.toml"))
+    Ok(config_dir()?.join("config.toml"))
 }
 
 pub fn load_or_init() -> Result<Config> {
