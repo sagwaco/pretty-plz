@@ -1,6 +1,6 @@
 [package]
 name = "plz"
-version = "0.1.2-rc1"
+version = "0.1.2"
 edition = "2024"
 description = "Natural-language to shell-command CLI"
 license = "Apache-2.0"
