@@ -18,7 +18,7 @@ the tag. That's it — the pipeline does the rest.
 Watch it:
 
 ```bash
-gh run watch --workflow=release.yml
+gh run watch "$(gh run list --workflow=release.yml -L1 --json databaseId --jq '.[0].databaseId')"
 ```
 
 ### What the pipeline does on a `v*` tag

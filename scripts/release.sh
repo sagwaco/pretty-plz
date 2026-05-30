@@ -67,7 +67,8 @@ printf 'Push main + tag now to trigger the release? [y/N] '
 read -r reply
 if [[ "$reply" == [yY] ]]; then
   git push origin main "v${new}"
-  echo "Pushed. Watch the release pipeline: gh run watch --workflow=release.yml"
+  echo "Pushed. Find the run:   gh run list --workflow=release.yml"
+  echo "       Then watch it:   gh run watch <run-id>"
 else
   echo "Not pushed. When ready:  git push origin main v${new}"
   echo "To undo the local release: git tag -d v${new} && git reset --hard HEAD~1"
