@@ -1,30 +1,18 @@
 # pretty-plz
 
-Natural-language to shell-command CLI. Ask for what you want, pick a command, run it.
-
-```
-$ plz find the biggest files in this folder
-? Pick a command:
-> du -ah . | sort -rh | head -n 10
-    list every file's size and show the 10 largest
-```
-
-The chosen command is printed to stdout — use it directly or with command substitution:
-
-```
-cmd=$(plz find duplicate jpegs under cwd)
-eval "$cmd"
-```
+Natural-language to shell-command CLI. Ask for what you want, pick a command, run it. The chosen command is printed to stdout for you to run.
 
 ## Quickstart
 
-Install:
+### Install:
+
+Use the install script:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sagwaco/pretty-plz/main/install.sh | sh
 ```
 
-Or with a package manager:
+Use a package manager instead:
 
 ```bash
 brew install sagwaco/tap/plz
@@ -34,17 +22,7 @@ brew install sagwaco/tap/plz
 npm install -g @sagwaco/plz
 ```
 
-(`brew` uses the [Homebrew tap](https://github.com/sagwaco/homebrew-tap); `npm` downloads the matching release binary for your platform.)
-
-When a newer release is available, `plz` prints a one-line hint to stderr. Upgrade with:
-
-```bash
-plz update
-# or
-plz configure update
-```
-
-Configure and use:
+### Configure:
 
 ```bash
 plz configure   # pick a provider, model, and enable shell auto-prefill
@@ -55,14 +33,10 @@ Or adjust one piece at a time:
 ```bash
 plz configure login   # sign in (alias for `plz login`)
 plz configure model   # change the default model
-plz configure update  # upgrade plz (alias for `plz update`)
+plz configure update  # update plz (alias for `plz update`)
 ```
 
-```bash
-plz find the biggest files here
-```
-
-Optional configuration:
+### Optional configuration:
 
 <details>
 <summary><b>Build from source (requires Rust 1.85+)</b></summary>
@@ -88,6 +62,16 @@ plz list files in cwd
 ```
 </details>
 
+## Updating
+
+When a newer release is available, `plz` prints a one-line hint to stderr. Upgrade with:
+
+```bash
+plz update
+# or
+plz configure update
+```
+
 ## Usage
 
 ```
@@ -101,7 +85,7 @@ Quotes are optional — everything after the flags is the query. Run `plz --help
 Common commands:
 
 ```
-plz login                  # interactive sign-in picker
+plz login                  # login to an LLM service
 plz configure              # full guided setup
 plz configure model        # change default model only
 plz status                 # show sign-in status
