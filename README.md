@@ -2,6 +2,8 @@
 
 Natural-language to shell-command CLI. Ask for what you want, pick a command, run it. The chosen command is printed to stdout for you to run.
 
+[![Demo](https://asciinema.org/a/KPffh9HEmEgwXORM.svg)](https://asciinema.org/a/KPffh9HEmEgwXORM)
+
 ## Quickstart
 
 ### Install:
