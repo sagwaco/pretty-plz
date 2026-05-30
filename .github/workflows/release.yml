@@ -40,18 +40,13 @@ jobs:
 
       - name: Package archive
         run: |
-          archive="plz-${GITHUB_REF_NAME}-${{ matrix.target }}.tar.gz"
           cp "target/${{ matrix.target }}/release/plz" plz
-          tar czf "$archive" plz
-          sha256sum "$archive" >> SHA256SUMS
-          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
+          tar czf "plz-${GITHUB_REF_NAME}-${{ matrix.target }}.tar.gz" plz
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
-          path: |
-            plz-*.tar.gz
-            SHA256SUMS
+          path: plz-*.tar.gz
 
   release:
     name: publish release
@@ -65,10 +60,13 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Combine checksums
+      - name: Generate checksums
         run: |
-          find artifacts -name SHA256SUMS -exec cat {} + | awk '!seen[$2]++' > SHA256SUMS
-          ls -la artifacts
+          # Hash the collected tarballs here. The per-target SHA256SUMS files of
+          # the old approach all shared one name and collided under
+          # download-artifact's merge-multiple, so only one line survived.
+          ( cd artifacts && sha256sum plz-*.tar.gz ) > SHA256SUMS
+          cat SHA256SUMS
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
