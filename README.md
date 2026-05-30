@@ -12,7 +12,7 @@ Use the install script:
 curl -fsSL https://raw.githubusercontent.com/sagwaco/pretty-plz/main/install.sh | sh
 ```
 
-Use a package manager instead:
+Or, use a package manager instead:
 
 ```bash
 brew install sagwaco/tap/plz
@@ -26,14 +26,6 @@ npm install -g @sagwaco/plz
 
 ```bash
 plz configure   # pick a provider, model, and enable shell auto-prefill
-```
-
-Or adjust one piece at a time:
-
-```bash
-plz configure login   # sign in (alias for `plz login`)
-plz configure model   # change the default model
-plz configure update  # update plz (alias for `plz update`)
 ```
 
 ### Optional configuration:
@@ -76,20 +68,26 @@ plz configure update
 
 ```
 plz <natural-language query>...
-plz --provider openai show disk usage of subdirs sorted descending
-plz --model claude-haiku-4-5 convert input.svg to a transparent 512x512 png
 ```
 
 Quotes are optional — everything after the flags is the query. Run `plz --help` for all flags.
 
-Common commands:
+```
+# Usage with flags
+plz --provider openai show disk usage of subdirs sorted descending
+plz --model claude-haiku-4-5 convert input.svg to a transparent 512x512 png
+```
+
+Available commands:
 
 ```
 plz login                  # login to an LLM service
-plz configure              # full guided setup
-plz configure model        # change default model only
 plz status                 # show sign-in status
 plz update                 # upgrade to the latest release
+plz configure              # full guided setup
+  plz configure login        # sign in (alias for `plz login`)
+  plz configure model        # change the default model
+  plz configure update       # update plz (alias for `plz update`)
 ```
 
 See [docs/](docs/) for shell integration, authentication, and configuration.
