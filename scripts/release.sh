@@ -32,6 +32,15 @@ git fetch -q origin
 
 current="$(grep -m1 '^version = ' Cargo.toml | sed -E 's/^version = "(.*)"/\1/')"
 
+# Relative bumps from a prerelease are ambiguous (does `patch` from 0.1.2-rc1
+# mean 0.1.2 or 0.1.3?). Refuse and point at the explicit form.
+if [[ "$current" == *-* && "$bump" =~ ^(patch|minor|major)$ ]]; then
+  echo "error: current version ${current} is a prerelease." >&2
+  echo "  to finalize it:      $0 ${current%%-*}" >&2
+  echo "  or bump explicitly:  $0 <X.Y.Z>" >&2
+  exit 1
+fi
+
 case "$bump" in
   patch|minor|major)
     IFS='.' read -r major minor patch <<<"${current%%-*}"
