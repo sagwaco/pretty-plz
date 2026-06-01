@@ -44,8 +44,8 @@ cargo install --path .
 ```
 
 Make sure `~/.cargo/bin` is on your `PATH` if you built from source.
-</details>
 
+</details>
 
 <details>
 <summary><b>Set credentials manually (optional):</b></summary>
@@ -54,6 +54,7 @@ Make sure `~/.cargo/bin` is on your `PATH` if you built from source.
 export ANTHROPIC_API_KEY=sk-ant-...
 plz list files in cwd
 ```
+
 </details>
 
 ## Updating
@@ -107,6 +108,18 @@ it has no telemetry or usage tracking.
 cargo build
 cargo build --release
 cargo run -- "list files in cwd"
+```
+
+Install your development build:
+
+```bash
+cargo install --path .
+```
+
+Uninstall your development build:
+
+```bash
+cargo uninstall plz
 ```
 
 ## License
